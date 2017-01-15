@@ -1,56 +1,63 @@
+#include <QueueArray.h>
 // Library Includes //
-//////////////////////
 #include <Adafruit_GFX.h>   // Core graphics library
 #include <RGBmatrixPanel.h> // Hardware-specific library
 //#include <PaintMatrixLogo.h> // Logo string paintMatrixLogo
 
-/////////////////////
 // Hardware Hookup //
-/////////////////////
-// R0, G0, B0, R1, G1, B1 should be connected to pins 
-// 2, 3, 4, 5, 6, and 7 respectively. Their pins aren't defined,
-// because they're controlled directly in the library. These pins
-// can be moved (somewhat):
 #define OE  9
 #define LAT 10
 #define A   A0
 #define B   A1
 #define C   A2
-#define D   A3 // Comment this line out if you're using a 32x16
-// CLK can be moved but must remain on PORTB(8, 9, 10, 11, 12, 13)
-#define CLK 11  // MUST be on PORTB!
-
-// Instantiate the RGBmatrixPanel class
+#define D   A3
+#define CLK 11
 RGBmatrixPanel matrix(A, B, C, D, CLK, LAT, OE, false);
+
+#define arr_len( x )  ( sizeof( x ) / sizeof( *x ) )
+
+//int cellQueue[50];
+QueueArray <String> cellQueue;
+boolean currentlyWriting = false;
 
 void setup() {
   matrix.begin();
   Serial.begin(9600);
-//  drawLogo(7000);
   drawSplashScreen(5000);
-//    Serial.end();
 }
 
 void loop() {
   while (Serial.available()) {
-    String testerString = Serial.readString();
-    char headChar = testerString.charAt(0);
+    String serialString = Serial.readString();
+    char headChar = serialString.charAt(0);
     if (headChar == 'U') {
-      String x = testerString.substring(1,3);
-      String y = testerString.substring(3,5);
-      char r = testerString.charAt(5); 
-      char g = testerString.charAt(6);
-      char b = testerString.charAt(7);
-      int rInt = r;
-      int gInt = g;
-      int bInt = b;
-      matrix.drawPixel(x.toInt(), y.toInt(), matrix.Color333(rInt, gInt, bInt));
-      Serial.write("W");
+      cellQueue.enqueue(serialString);
     } else {
       matrix.setCursor(0,0);
-      drawPictureRGB(testerString);  
+      drawPictureRGB(serialString);  
     }
   }
+
+  if (cellQueue.isEmpty() == false && currentlyWriting == false) {
+    currentlyWriting = true;
+    String currentString = cellQueue.dequeue();
+    drawPixelFromString(currentString);
+    currentlyWriting = false;
+  }
+}
+
+void drawPixelFromString(String currentString) {
+  String x = currentString.substring(1,3);
+  String y = currentString.substring(3,5);
+  int xInt = x.toInt();
+  int yInt = y.toInt();
+  char r = currentString.charAt(5); 
+  char g = currentString.charAt(6);
+  char b = currentString.charAt(7);
+  int rInt = r;
+  int gInt = g;
+  int bInt = b;
+  matrix.drawPixel(xInt, yInt, matrix.Color333(rInt, gInt, bInt));
 }
 
 void drawLogo(int delayLength) {
@@ -86,3 +93,8 @@ void blankMatrix()
 {
   matrix.fillScreen(0);
 }
+
+void endSerial() {
+  Serial.end();
+}
+
